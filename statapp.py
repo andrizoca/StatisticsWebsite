@@ -287,82 +287,104 @@ button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
                 
 with aba_principal2:
     st.subheader("Agrupamento por Classes")
-    
+    st.markdown(
+        "Preencha `Li` e `Ls` na primeira linha. "
+        "Clique em **Adicionar classe (+)** para criar a próxima com o mesmo `h = Ls − Li`."
+    )
+
     if 'df_classes' not in st.session_state:
         st.session_state.df_classes = pd.DataFrame([{"Li": None, "Ls": None, "fi": None}])
 
-    st.markdown("#### Preencha a primeira linha. Para adicionar novas classes com preenchimento automático, **clique no `+` abaixo**.")
-    
-    edited_df = st.data_editor(
-        st.session_state.df_classes,
-        num_rows="dynamic",
-        use_container_width=True,
-        column_config={
-            "Li": st.column_config.NumberColumn("Limite Inferior (lᵢ)"),
-            "Ls": st.column_config.NumberColumn("Limite Superior (ls)"),
-            "fi": st.column_config.NumberColumn("Frequência (fi)", min_value=0, step=1),
-        },
-        key="editor_classes"
-    )
+    # ===== UM ÚNICO FORM (editor -> botão + -> checkboxes -> Calcular) =====
+    with st.form("form_classes_all", clear_on_submit=False):
+        edited_df = st.data_editor(
+            st.session_state.df_classes,
+            num_rows="fixed",                # sem '+' nativo
+            use_container_width=True,
+            column_config={
+                "Li": st.column_config.NumberColumn("Limite Inferior (lᵢ)", format="%d", step=1),
+                "Ls": st.column_config.NumberColumn("Limite Superior (lₛ)", format="%d", step=1),
+                "fi": st.column_config.NumberColumn("Frequência (fi)", min_value=0, step=1, format="%d"),
+            },
+            key="editor_classes"
+        )
 
-    if len(edited_df) > len(st.session_state.df_classes):
-        last_row_index = len(edited_df) - 1
-        prev_row_index = last_row_index - 1
+        # Botão + ANTES dos checkboxes
+        add_clicked = st.form_submit_button("Adicionar classe (+)", use_container_width=True)
 
-        prev_Li = edited_df.loc[prev_row_index, 'Li']
-        prev_Ls = edited_df.loc[prev_row_index, 'Ls']
-
-        if pd.notna(prev_Li) and pd.notna(prev_Ls):
-            h = prev_Ls - prev_Li
-            edited_df.loc[last_row_index, 'Li'] = prev_Ls
-            edited_df.loc[last_row_index, 'Ls'] = prev_Ls + h
-    
-    st.session_state.df_classes = edited_df
-
-    with st.form("form_classes"):
         st.markdown("### Selecione o que deseja calcular: ")
-        mediacbx = st.checkbox("Média") 
-        medianacbx = st.checkbox("Mediana")
-        modabrutacbx = st.checkbox("Moda Bruta")
-        modaczubercbx = st.checkbox("Moda de Czuber")
-        varianciacbx = st.checkbox("Variância")
+        mediacbx        = st.checkbox("Média")
+        medianacbx      = st.checkbox("Mediana")
+        modabrutacbx    = st.checkbox("Moda Bruta")
+        modaczubercbx   = st.checkbox("Moda de Czuber")
+        varianciacbx    = st.checkbox("Variância")
         desviopadraocbx = st.checkbox("Desvio Padrão")
-        coeficientecbx = st.checkbox("Coeficiente de Variação")
-        
-        sub_classes = st.form_submit_button("Calcular")
+        coeficientecbx  = st.checkbox("Coeficiente de Variação")
 
-        if sub_classes:
-            try:
-                tabela_classes = st.session_state.df_classes.copy().dropna().astype(float)
-                if tabela_classes.empty:
-                    raise ValueError("A tabela está vazia ou contém dados inválidos.")
+        calc_clicked = st.form_submit_button("Calcular", use_container_width=True)
 
-                media = media_agrupada(tabela_classes)
-                mediana = mediana_agrupada(tabela_classes)
-                modas_brutas, modas_czuber, tipo_moda = moda_agrupada(tabela_classes)
-                variancia = variancia_agrupada(tabela_classes, media)
-                desvio_padrao = arredondar(math.sqrt(variancia))
-                coeficiente_variacao = arredondar((100 * desvio_padrao) / media, 2) if media != 0 else None
+    # ===== (+): usa exatamente o que está NA TELA (edited_df) =====
+    if add_clicked:
+        base = edited_df.copy()
 
-                if mediacbx:
-                    st.success(f"### Média: {media:.2f}")
-                if medianacbx:
-                    st.success(f"### Mediana: {mediana:.2f}")
-                if modabrutacbx:
-                    st.success(f"### Moda Bruta ({tipo_moda}): " + ", ".join(f"{m:.2f}" for m in modas_brutas))
-                if modaczubercbx:
-                    cz_strs = [f"{m:.2f}" if m is not None else "N/A" for m in modas_czuber]
-                    st.success(f"### Moda de Czuber ({tipo_moda}): " + ", ".join(cz_strs))
-                if varianciacbx:
-                    st.success(f"### Variância: {variancia:.2f}")
-                if desviopadraocbx:
-                    st.success(f"### Desvio Padrão: {desvio_padrao:.2f}")
-                if coeficientecbx:
-                    if coeficiente_variacao is not None:
-                        st.success(f"### Coeficiente de Variação: {coeficiente_variacao:.2f}%")
-                    else:
-                        st.warning("### Coeficiente de Variação: Indefinido (a média é zero)")
-            
-            except Exception as e:
-                st.error(f"Erro: {e}")
+        tmp = base.copy()
+        tmp["Li"] = pd.to_numeric(tmp["Li"], errors="coerce")
+        tmp["Ls"] = pd.to_numeric(tmp["Ls"], errors="coerce")
+
+        comp = tmp.dropna(subset=["Li", "Ls"])
+        if not comp.empty:
+            last_idx = comp.index.max()
+            prev_Li  = int(round(tmp.loc[last_idx, "Li"]))
+            prev_Ls  = int(round(tmp.loc[last_idx, "Ls"]))
+            h_int    = int(round(prev_Ls - prev_Li))
+            if h_int > 0:
+                new_row = {"Li": prev_Ls, "Ls": prev_Ls + h_int, "fi": None}
+            else:
+                new_row = {"Li": None, "Ls": None, "fi": None}
+        else:
+            new_row = {"Li": None, "Ls": None, "fi": None}
+
+        st.session_state.df_classes = pd.concat(
+            [base, pd.DataFrame([new_row])], ignore_index=True
+        )
+        st.rerun()
+
+    # ===== Calcular: usa o edited_df confirmado pelo form =====
+    if calc_clicked:
+        try:
+            tabela_classes = edited_df.copy()
+            tabela_classes["Li"] = pd.to_numeric(tabela_classes["Li"], errors="coerce")
+            tabela_classes["Ls"] = pd.to_numeric(tabela_classes["Ls"], errors="coerce")
+            tabela_classes["fi"] = pd.to_numeric(tabela_classes["fi"], errors="coerce")
+            tabela_classes = tabela_classes.dropna(subset=["Li", "Ls", "fi"]).astype(float)
+
+            if tabela_classes.empty:
+                raise ValueError("A tabela está vazia ou contém dados inválidos.")
+
+            media = media_agrupada(tabela_classes)
+            mediana = mediana_agrupada(tabela_classes)
+            modas_brutas, modas_czuber, tipo_moda = moda_agrupada(tabela_classes)
+            variancia = variancia_agrupada(tabela_classes, media)
+            desvio_padrao = arredondar(math.sqrt(variancia))
+            coeficiente_variacao = arredondar((100 * desvio_padrao) / media, 2) if media != 0 else None
+
+            cards = []
+            if mediacbx:        cards.append(("Média", f"{media:.2f}"))
+            if medianacbx:      cards.append(("Mediana", f"{mediana:.2f}"))
+            if modabrutacbx:    cards.append(("Moda Bruta", ", ".join(f"{m:.2f}" for m in modas_brutas)))
+            if modaczubercbx:   cards.append(("Moda de Czuber", ", ".join("N/A" if m is None else f"{m:.2f}" for m in modas_czuber)))
+            if varianciacbx:    cards.append(("Variância", f"{variancia:.2f}"))
+            if desviopadraocbx: cards.append(("Desvio Padrão", f"{desvio_padrao:.2f}"))
+            if coeficientecbx:
+                cards.append(("Coeficiente de Variação", f"{coeficiente_variacao:.2f}%" if coeficiente_variacao is not None else "Indefinido"))
+
+            # imprime em 3 colunas (quebra em novas linhas automaticamente)
+            cols = st.columns(2)
+            for i, (titulo, valor) in enumerate(cards):
+                with cols[i % 2]:
+                    st.metric(titulo, valor)
+        except Exception as e:
+            st.error(f"Erro: {e}")
+
+
 
