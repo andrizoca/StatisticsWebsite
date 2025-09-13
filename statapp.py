@@ -1,5 +1,6 @@
+#Import das bibliotecas
 import re
-import streamlit as st
+import streamlit as st #Framework
 import pandas as pd
 from collections import Counter
 from decimal import Decimal, ROUND_HALF_UP
@@ -131,7 +132,7 @@ def variancia_agrupada(df: pd.DataFrame, media: float) -> float:
     variancia = (((df["Pmi"] - media)**2) * df["fi"]).sum() / (N - 1)
     return arredondar(variancia)
     
-st.set_page_config(page_title = "Estatística", page_icon = "heavy_plus_sign", layout="centered")
+st.set_page_config(page_title = "Estatística", page_icon = "heavy_plus_sign", layout="wide")
 st.markdown("""
 <style>
 div[data-testid="stDataFrame"] div[role="rowheader"] {
@@ -212,18 +213,20 @@ button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
                 cv = (100 * desvio_padrao)/m
                 coeficiente_variacao = arredondar(cv, 2)
                 
-                if mediacbx: 
-                    st.success(f"### Média: {m:.2f}")
-                if medianacbx:
-                    st.success(f"### Mediana: {me:.2f}")
-                if modacbx:
-                    st.success(f"### Moda ({tipo}) : {', '.join(f'{x:.2f}' for x in modais)} ")
-                if varianciacbx: 
-                    st.success(f"### Variância: {variance:.2f}")
-                if desviopadraocbx: 
-                    st.success(f"### Desvio Padrão: {desvio_padrao:.2f}")
-                if coeficientecbx: 
-                    st.success(f"### Coeficiente de Variação: {coeficiente_variacao:.2f}%")
+                # ======== IMPRESSÃO EM 2 COLUNAS (sem metric para não truncar) ========
+                cards = []
+                if mediacbx:        cards.append(("Média", f"{m:.2f}"))
+                if medianacbx:      cards.append(("Mediana", f"{me:.2f}"))
+                if varianciacbx:    cards.append(("Variância", f"{variance:.2f}"))
+                if desviopadraocbx: cards.append(("Desvio Padrão", f"{desvio_padrao:.2f}"))
+                if coeficientecbx:  cards.append(("Coeficiente de Variação", f"{coeficiente_variacao:.2f}%"))
+                if modacbx:         cards.append((f"Moda ({tipo})", ", ".join(f"{x:.2f}" for x in modais)))
+
+                cols = st.columns(2)
+                for i, (titulo, valor) in enumerate(cards):
+                    with cols[i % 2]:
+                        st.success(f"**{titulo}:** {valor}")
+                # ============================================================
                     
             except Exception as e:
                 st.warning(str(e))
@@ -268,18 +271,20 @@ button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
                 cv = (100 * desvio_padrao)/m
                 coeficiente_variacao = arredondar(cv, 2)
                 
-                if mediacbx: 
-                    st.success(f"### Média: {m:.2f}")
-                if medianacbx:
-                    st.success(f"### Mediana: {me:.2f}")
-                if modacbx:
-                    st.success(f"### Moda ({tipo}) : {', '.join(f'{x:.2f}' for x in modais)} ")
-                if varianciacbx: 
-                    st.success(f"### Variância: {variance:.2f}")
-                if desviopadraocbx: 
-                    st.success(f"### Desvio Padrão: {desvio_padrao:.2f}")
-                if coeficientecbx: 
-                    st.success(f"### Coeficiente de Variação: {coeficiente_variacao:.2f}%")
+                # ======== IMPRESSÃO EM 2 COLUNAS (sem metric para não truncar) ========
+                cards = []
+                if mediacbx:        cards.append(("Média", f"{m:.2f}"))
+                if medianacbx:      cards.append(("Mediana", f"{me:.2f}"))
+                if varianciacbx:    cards.append(("Variância", f"{variance:.2f}"))
+                if desviopadraocbx: cards.append(("Desvio Padrão", f"{desvio_padrao:.2f}"))
+                if coeficientecbx:  cards.append(("Coeficiente de Variação", f"{coeficiente_variacao:.2f}%"))
+                if modacbx:         cards.append((f"Moda ({tipo})", ", ".join(f"{x:.2f}" for x in modais)))
+
+                cols = st.columns(2)
+                for i, (titulo, valor) in enumerate(cards):
+                    with cols[i % 2]:
+                        st.success(f"**{titulo}:** {valor}")
+                # ============================================================
                 
             except Exception as e:
                 st.error(f"Entrada inválida: {e}")
@@ -368,23 +373,22 @@ with aba_principal2:
             desvio_padrao = arredondar(math.sqrt(variancia))
             coeficiente_variacao = arredondar((100 * desvio_padrao) / media, 2) if media != 0 else None
 
+            # ======== IMPRESSÃO EM 2 COLUNAS (sem metric para não truncar) ========
             cards = []
             if mediacbx:        cards.append(("Média", f"{media:.2f}"))
             if medianacbx:      cards.append(("Mediana", f"{mediana:.2f}"))
-            if modabrutacbx:    cards.append(("Moda Bruta", ", ".join(f"{m:.2f}" for m in modas_brutas)))
-            if modaczubercbx:   cards.append(("Moda de Czuber", ", ".join("N/A" if m is None else f"{m:.2f}" for m in modas_czuber)))
             if varianciacbx:    cards.append(("Variância", f"{variancia:.2f}"))
             if desviopadraocbx: cards.append(("Desvio Padrão", f"{desvio_padrao:.2f}"))
             if coeficientecbx:
                 cards.append(("Coeficiente de Variação", f"{coeficiente_variacao:.2f}%" if coeficiente_variacao is not None else "Indefinido"))
+            if modabrutacbx:    cards.append(("Moda Bruta", ", ".join(f"{m:.2f}" for m in modas_brutas)))
+            if modaczubercbx:   cards.append(("Moda de Czuber", ", ".join("N/A" if m is None else f"{m:.2f}" for m in modas_czuber)))
 
-            # imprime em 3 colunas (quebra em novas linhas automaticamente)
             cols = st.columns(2)
             for i, (titulo, valor) in enumerate(cards):
                 with cols[i % 2]:
-                    st.metric(titulo, valor)
+                    st.success(f"**{titulo}:** {valor}")
+            # ============================================================
+
         except Exception as e:
             st.error(f"Erro: {e}")
-
-
-
