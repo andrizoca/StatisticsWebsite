@@ -213,6 +213,16 @@ def variancia_agrupada(df: pd.DataFrame, media: float) -> float:
 # -------------------------------
 st.set_page_config(page_title="Estatística", page_icon="heavy_plus_sign", layout="wide")
 
+# Seeds para recriar widgets ao limpar (evita mexer em keys já instanciadas)
+if "text_area1_seed" not in st.session_state:
+    st.session_state["text_area1_seed"] = 0
+if "editor_discreto_seed" not in st.session_state:
+    st.session_state["editor_discreto_seed"] = 0
+
+# DF persistente para o editor do discreto (evita depender do estado interno do widget)
+if "df_discreto" not in st.session_state:
+    st.session_state.df_discreto = pd.DataFrame({"xi": [None], "fi": [None]})
+
 # CSS para aumentar fonte de células, cabeçalhos e checkboxes
 st.markdown("""
 <style>
@@ -280,17 +290,22 @@ with aba_principal1:
     # ---------------------------
     with tab1:
         base = pd.DataFrame({"xi": [None], "fi": [None]})
+        clear_tab1 = False  # [Limpar] default
         with st.form("form_tabela"):
             st.markdown("#### Para adicionar mais linhas, **clique no `+` abaixo da tabela**.")
             edited = st.data_editor(
-                base,
+                st.session_state.df_discreto,
                 num_rows="dynamic",          # permite adicionar/remover linhas
                 use_container_width=True,
                 column_config={
                     "xi": st.column_config.NumberColumn("xᵢ"),
-                    "fi": st.column_config.NumberColumn("fᵢ", min_value=0, step=1),
-                }
+                    "fi": st.column_config.NumberColumn("Frequência(fᵢ)", min_value=0, step=1),
+                },
+                key=f"editor_discreto_{st.session_state['editor_discreto_seed']}"  # seed na key
             )
+
+            # [LIMPAR] botão logo abaixo da tabela
+            clear_tab1 = st.form_submit_button("Limpar tabela", type="secondary", use_container_width=True)
             
             # Seleção de medidas a serem calculadas
             st.markdown("### Selecione o que deseja calcular: ")
@@ -301,19 +316,29 @@ with aba_principal1:
             desviopadraocbx = st.checkbox("Desvio Padrão")
             coeficientecbx = st.checkbox("Coeficiente de Variação")
             
-            sub = st.form_submit_button("Calcular")
+            # Botão Calcular sozinho
+            sub = st.form_submit_button("Calcular", use_container_width=True)
+
+        # [Limpar] reset do editor após o form (recria o widget e zera o DF)
+        if clear_tab1:
+            st.session_state.df_discreto = base.copy()
+            st.session_state["editor_discreto_seed"] += 1
+            st.rerun()
+
+        # Atualiza DF persistente com o que está na tela
+        st.session_state.df_discreto = edited.copy()
 
         # Processamento ao clicar em "Calcular"
         if sub:
             try:
                 # Limpa linhas vazias e força numérico
-                edited = edited.dropna().astype(float)
+                edited_num = edited.dropna().astype(float)
 
                 # Cálculos principais
-                m = arredondar(media_ponderada_df(edited), 2)
-                me = arredondar(mediana_df(edited), 2)
-                modais, tipo = moda_df(edited)
-                variance = arredondar(variancia_df(edited), 2)
+                m = arredondar(media_ponderada_df(edited_num), 2)
+                me = arredondar(mediana_df(edited_num), 2)
+                modais, tipo = moda_df(edited_num)
+                variance = arredondar(variancia_df(edited_num), 2)
                 desvio_padrao = arredondar(math.sqrt(variance), 2)
                 cv = (100 * desvio_padrao) / m
                 coeficiente_variacao = arredondar(cv, 2)
@@ -341,6 +366,7 @@ with aba_principal1:
     # Tab 2: entrada por texto
     # ---------------------------
     with tab2:
+        clear_text = False  # [Limpar] default
         with st.form("form_texto"):
             # Aumenta a fonte/altura da área de texto
             st.markdown("""
@@ -352,9 +378,13 @@ with aba_principal1:
             </style>
             """, unsafe_allow_html=True)
 
-            st.subheader("Digite os números a serem calculados separados por espaço ou vírgula")
-            s = st.text_area(label=' ', key='text_area1')  # input do usuário
+            st.subheader("Digite os números a serem calculados separados por espaço")
+            # Usa seed na key para recriar o widget ao limpar (evita modificar uma key já instanciada)
+            s = st.text_area(label=' ', key=f'text_area1_{st.session_state["text_area1_seed"]}')
             st.caption(f"### Números a serem calculados: {s}")
+
+            # [LIMPAR] botão logo abaixo da área de texto
+            clear_text = st.form_submit_button("Limpar entrada", type="secondary", use_container_width=True)
             
             # Seleção de medidas
             st.markdown("### Selecione o que deseja calcular: ")
@@ -365,7 +395,13 @@ with aba_principal1:
             desviopadraocbx = st.checkbox("Desvio Padrão")
             coeficientecbx = st.checkbox("Coeficiente de Variação")
             
-            sub2 = st.form_submit_button("Calcular")
+            # Botão Calcular sozinho
+            sub2 = st.form_submit_button("Calcular", use_container_width=True)
+
+        # [Limpar] recria o text_area com nova key (sem tocar na key já instanciada)
+        if clear_text:
+            st.session_state["text_area1_seed"] += 1
+            st.rerun()
 
         if sub2:
             try:
@@ -419,6 +455,8 @@ with aba_principal2:
     if 'df_classes' not in st.session_state:
         st.session_state.df_classes = pd.DataFrame([{"Li": None, "Ls": None, "fi": None}])
 
+    clear_classes = False  # [Limpar] default
+
     # Um único form combina: editor + botão adicionar + checkboxes + calcular
     with st.form("form_classes_all", clear_on_submit=False):
         edited_df = st.data_editor(
@@ -434,8 +472,9 @@ with aba_principal2:
             key="editor_classes"
         )
 
-        # Botão de adicionar classe vem ANTES dos checkboxes
+        # Botões logo abaixo da tabela
         add_clicked = st.form_submit_button("Adicionar classe (+)", use_container_width=True)
+        clear_classes = st.form_submit_button("Limpar tabela", type="secondary", use_container_width=True)
 
         # Checkboxes para escolher o que calcular
         st.markdown("### Selecione o que deseja calcular: ")
@@ -447,17 +486,27 @@ with aba_principal2:
         desviopadraocbx = st.checkbox("Desvio Padrão")
         coeficientecbx  = st.checkbox("Coeficiente de Variação")
 
+        # Botão Calcular sozinho
         calc_clicked = st.form_submit_button("Calcular", use_container_width=True)
+
+    # ---------------------------
+    # [Limpar] reset da tabela de classes
+    # ---------------------------
+    if clear_classes:
+        st.session_state.df_classes = pd.DataFrame([{"Li": None, "Ls": None, "fi": None}])
+        if "editor_classes" in st.session_state:
+            del st.session_state["editor_classes"]  # limpa estado do widget
+        st.rerun()
 
     # ---------------------------
     # Lógica do botão (+)
     # ---------------------------
     if add_clicked:
         # 'edited_df' já traz o que está na tela (confirmado ao enviar o form)
-        base = edited_df.copy()
+        base_cls = edited_df.copy()
 
         # Converte colunas para numérico, ignorando erros
-        tmp = base.copy()
+        tmp = base_cls.copy()
         tmp["Li"] = pd.to_numeric(tmp["Li"], errors="coerce")
         tmp["Ls"] = pd.to_numeric(tmp["Ls"], errors="coerce")
 
@@ -480,7 +529,7 @@ with aba_principal2:
             new_row = {"Li": None, "Ls": None, "fi": None}
 
         # Persiste a nova linha no session_state e força rerun para atualizar a UI
-        st.session_state.df_classes = pd.concat([base, pd.DataFrame([new_row])], ignore_index=True)
+        st.session_state.df_classes = pd.concat([base_cls, pd.DataFrame([new_row])], ignore_index=True)
         st.rerun()
 
     # ---------------------------
