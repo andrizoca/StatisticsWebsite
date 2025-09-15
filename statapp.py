@@ -1,26 +1,54 @@
-#Import das bibliotecas
+# -------------------------------
+# Import das bibliotecas
+# -------------------------------
 import re
-import streamlit as st #Framework
+import streamlit as st  # Framework web
 import pandas as pd
 from collections import Counter
 from decimal import Decimal, ROUND_HALF_UP
 import statistics
 import math
 
+
+# -------------------------------
+# Funções utilitárias / estatística
+# -------------------------------
+
 def arredondar(valor: float, casas: int = 2) -> float:
+    """
+    Arredonda 'valor' para 'casas' decimais usando HALF_UP (5 arredonda para cima).
+    Evita erros de binário do float usando Decimal.
+    """
     return float(Decimal(str(valor)).quantize(Decimal("1." + "0"*casas), rounding=ROUND_HALF_UP))
 
+
 def parse_numeros(s: str):
+    """
+    Extrai números de um texto aceitando vírgula OU ponto como decimal.
+    Ex.: "10,5 7 2.3" -> [10.5, 7.0, 2.3]
+
+    Observação: não trata milhares do tipo "1.234,56". Para isso,
+    seria necessário um parser um pouco mais elaborado.
+    """
     tokens = re.findall(r'[-+]?\d+(?:[.,]\d+)?', s)
     return [float(t.replace(",", ".")) for t in tokens]
 
+
 def media_ponderada_df(df: pd.DataFrame) -> float:
+    """
+    Média ponderada para dados discretos: sum(xi*fi) / sum(fi).
+    Exige ao menos uma linha válida e sum(fi) > 0.
+    """
     df = df.dropna()
     if df.empty or df["fi"].sum() == 0:
         raise ValueError("Inclua ao menos uma linha válida e frequências > 0.")
     return (df["xi"]*df["fi"]).sum() / df["fi"].sum()
 
+
 def mediana_df(df: pd.DataFrame) -> float:
+    """
+    Mediana para dados discretos: repete cada xi pela sua fi e aplica statistics.median.
+    """
     df = df.dropna()
     if df.empty or df["fi"].sum() == 0:
         raise ValueError("Inclua ao menos uma linha válida e frequências > 0.")
@@ -28,7 +56,14 @@ def mediana_df(df: pd.DataFrame) -> float:
     lista_numeros_df = serie_numeros_df.tolist()
     return statistics.median(lista_numeros_df)
 
+
 def moda_df(df: pd.DataFrame):
+    """
+    Moda para dados discretos:
+    - Conta as ocorrências considerando as frequências;
+    - Retorna a(s) moda(s) e o tipo (uni, bi, tri, ... multimodal);
+    - Se todas as frequências empatam, considera amodal.
+    """
     df = df.dropna()
     if df.empty or df["fi"].sum() == 0:
         raise ValueError("Inclua ao menos uma linha válida e frequências > 0.")
@@ -39,6 +74,7 @@ def moda_df(df: pd.DataFrame):
     contagem = Counter(lista_numeros_df)
     freqmax = max(contagem.values())
     
+    # Todos empatados no máximo => amodal
     if all(f == freqmax for f in contagem.values()):
         return [], "amodal"
     
@@ -52,7 +88,11 @@ def moda_df(df: pd.DataFrame):
     tipo_moda = tipos.get(qtd_modais, "multimodal")
     return lista_modais, tipo_moda
 
+
 def variancia_df(df: pd.DataFrame) -> float:
+    """
+    Variância amostral para dados discretos (statistics.variance já usa N-1).
+    """
     df = df.dropna()
     if df.empty or df["fi"].sum() == 0:
         raise ValueError("Inclua ao menos uma linha válida e frequências > 0.")
@@ -60,7 +100,11 @@ def variancia_df(df: pd.DataFrame) -> float:
     lista_numeros_df = serie_numeros_df.tolist()
     return statistics.variance(lista_numeros_df)
 
+
 def media_agrupada(df: pd.DataFrame) -> float:
+    """
+    Média para dados agrupados: usa ponto médio Pmi = (Li + Ls)/2 e soma ponderada por fi.
+    """
     df["Pmi"] = (df["Li"] + df["Ls"]) / 2
     N = df["fi"].sum()
     if N == 0:
@@ -68,7 +112,14 @@ def media_agrupada(df: pd.DataFrame) -> float:
     media = (df["Pmi"] * df["fi"]).sum() / N
     return arredondar(media)
 
+
 def mediana_agrupada(df: pd.DataFrame) -> float:
+    """
+    Mediana para dados agrupados:
+    1) Calcula Fac (frequência acumulada);
+    2) Encontra a classe onde Fac >= N/2;
+    3) Aplica interpolação linear: Med = L + ((N/2 - F_anterior)/f_classe)*h.
+    """
     N = df["fi"].sum()
     df["Fac"] = df["fi"].cumsum()
     
@@ -89,7 +140,22 @@ def mediana_agrupada(df: pd.DataFrame) -> float:
     mediana = L + ((N2 - F_anterior) / f) * h
     return arredondar(mediana)
 
+
 def moda_agrupada(df: pd.DataFrame):
+    """
+    Moda para dados agrupados (bruta e Czuber):
+    - 'modas_brutas' = ponto médio da(s) classe(s) com fi máxima;
+    - 'modas_czuber' = interpolação de Czuber:
+        Mo ≈ Li + (d1/(d1+d2)) * h, onde d1 = f_modal - f_prev e d2 = f_modal - f_next.
+      Neste código, quando (d1+d2) <= 0 (ex.: planalto/empate), retorna None (N/A).
+      Obs.: se quiser a REGRA RIGOROSA dos vizinhos (pico local estrito), troque a
+      checagem por:
+         if f_prev is not None and f_next is not None and (f_modal > f_prev) and (f_modal > f_next):
+            ...
+         else:
+            modas_czuber.append(None)
+    - 'tipo_moda' classifica uni/bi/tri/.../multimodal segundo o nº de classes modais.
+    """
     t = df.reset_index(drop=True)
     freqmax = t["fi"].max()
     modal_pos = t.index[t["fi"] == freqmax].tolist()
@@ -106,6 +172,7 @@ def moda_agrupada(df: pd.DataFrame):
     for pos in modal_pos:
         Li, Ls = float(t.at[pos, "Li"]), float(t.at[pos, "Ls"])
         h_classe = Ls - Li
+        # Moda bruta (ponto médio)
         modas_brutas.append((Li + Ls) / 2)
         
         f_modal = float(t.at[pos, "fi"])
@@ -113,6 +180,9 @@ def moda_agrupada(df: pd.DataFrame):
         f_next = float(t.at[pos + 1, "fi"]) if pos + 1 < len(t) else 0.0
         
         d1, d2 = f_modal - f_prev, f_modal - f_next
+
+        # Czuber definida somente se (d1 + d2) > 0 (evita divisão por zero/planaltos)
+        # (Para a regra rigorosa de pico local, veja comentário no docstring acima.)
         if (d1 + d2) > 0:
             moda_cz = Li + (d1 / (d1 + d2)) * h_classe
             modas_czuber.append(arredondar(moda_cz))
@@ -121,7 +191,12 @@ def moda_agrupada(df: pd.DataFrame):
             
     return modas_brutas, modas_czuber, tipo_moda
 
+
 def variancia_agrupada(df: pd.DataFrame, media: float) -> float:
+    """
+    Variância amostral para dados agrupados (dividindo por N-1).
+    Usa Pmi como representante da classe.
+    """
     N = df["fi"].sum()
     if N <= 1:
         raise ValueError("A amostra precisa ter mais de um elemento para calcular a variância.")
@@ -131,8 +206,14 @@ def variancia_agrupada(df: pd.DataFrame, media: float) -> float:
          
     variancia = (((df["Pmi"] - media)**2) * df["fi"]).sum() / (N - 1)
     return arredondar(variancia)
-    
-st.set_page_config(page_title = "Estatística", page_icon = "heavy_plus_sign", layout="wide")
+
+
+# -------------------------------
+# Configuração e estilo da página
+# -------------------------------
+st.set_page_config(page_title="Estatística", page_icon="heavy_plus_sign", layout="wide")
+
+# CSS para aumentar fonte de células, cabeçalhos e checkboxes
 st.markdown("""
 <style>
 div[data-testid="stDataFrame"] div[role="rowheader"] {
@@ -152,27 +233,40 @@ div[data-testid="stCheckbox"] label {
 """, unsafe_allow_html=True)
 
 
-st.title(":red[Bem vindo ao site de Estatística]",anchor = None)
+# -------------------------------
+# Cabeçalho
+# -------------------------------
+st.title(":red[Bem vindo ao site de Estatística]", anchor=None)
 st.subheader("Esta aplicação é uma calculadora que utiliza agrupamentos discreto e por classes para calcular: ")
 st.markdown("##### Cálculo de média - Mediana - Modas - Variância - Desvio Padrão - Coeficiente de Variação")
 st.markdown(":gray[_Criado por Andriy Tam, Henrique Sabino, Paulo Santos e Luis Carlos Oliveira_]")
 st.divider()
 
 
+# -------------------------------
+# Abas principais
+# -------------------------------
 aba_principal1, aba_principal2 = st.tabs(["Agrupamento Discreto", "Agrupamento por Classes"])
 
+
+# =====================================================================================
+# ABA 1: Agrupamento Discreto
+# =====================================================================================
 with aba_principal1:
+    # CSS para o título das subtabs
     st.markdown("""
-<style>
-button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
-    font-size: 50px;
-    font-weight: bold; 
-}
-</style>
-""", unsafe_allow_html=True)
+    <style>
+    button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
+        font-size: 50px;
+        font-weight: bold; 
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.caption("## Selecione o método de entrada:")
     tab1, tab2 = st.tabs(["Tabela (xᵢ, fᵢ)", "Lista de valores"])
 
+    # CSS para o rótulo das subtabs (menor)
     st.markdown("""
     <style>
     button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
@@ -181,18 +275,24 @@ button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
     </style>
     """, unsafe_allow_html=True)
 
+    # ---------------------------
+    # Tab 1: entrada por tabela
+    # ---------------------------
     with tab1:
-        base = pd.DataFrame({"xi":[None], "fi":[None]})
+        base = pd.DataFrame({"xi": [None], "fi": [None]})
         with st.form("form_tabela"):
             st.markdown("#### Para adicionar mais linhas, **clique no `+` abaixo da tabela**.")
             edited = st.data_editor(
-                base, num_rows="dynamic", use_container_width=True,
+                base,
+                num_rows="dynamic",          # permite adicionar/remover linhas
+                use_container_width=True,
                 column_config={
                     "xi": st.column_config.NumberColumn("xᵢ"),
                     "fi": st.column_config.NumberColumn("fᵢ", min_value=0, step=1),
                 }
             )
             
+            # Seleção de medidas a serem calculadas
             st.markdown("### Selecione o que deseja calcular: ")
             mediacbx = st.checkbox("Média") 
             medianacbx = st.checkbox("Mediana")
@@ -202,18 +302,23 @@ button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
             coeficientecbx = st.checkbox("Coeficiente de Variação")
             
             sub = st.form_submit_button("Calcular")
+
+        # Processamento ao clicar em "Calcular"
         if sub:
             try:
+                # Limpa linhas vazias e força numérico
                 edited = edited.dropna().astype(float)
+
+                # Cálculos principais
                 m = arredondar(media_ponderada_df(edited), 2)
-                me = arredondar(mediana_df(edited),2)
+                me = arredondar(mediana_df(edited), 2)
                 modais, tipo = moda_df(edited)
                 variance = arredondar(variancia_df(edited), 2)
                 desvio_padrao = arredondar(math.sqrt(variance), 2)
-                cv = (100 * desvio_padrao)/m
+                cv = (100 * desvio_padrao) / m
                 coeficiente_variacao = arredondar(cv, 2)
                 
-                # ======== IMPRESSÃO EM 2 COLUNAS (sem metric para não truncar) ========
+                # Impressão em 2 colunas (usa st.success para não truncar texto)
                 cards = []
                 if mediacbx:        cards.append(("Média", f"{m:.2f}"))
                 if medianacbx:      cards.append(("Mediana", f"{me:.2f}"))
@@ -226,26 +331,32 @@ button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
                 for i, (titulo, valor) in enumerate(cards):
                     with cols[i % 2]:
                         st.success(f"**{titulo}:** {valor}")
-                # ============================================================
                     
             except Exception as e:
+                # Mostra aviso amigável (sem stacktrace)
                 st.warning(str(e))
     
 
+    # ---------------------------
+    # Tab 2: entrada por texto
+    # ---------------------------
     with tab2:
         with st.form("form_texto"):
+            # Aumenta a fonte/altura da área de texto
             st.markdown("""
-        <style>
-        [data-testid="stTextArea"] textarea {
-            font-size: 22px !important;
-            height: 150px;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+            <style>
+            [data-testid="stTextArea"] textarea {
+                font-size: 22px !important;
+                height: 150px;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
             st.subheader("Digite os números a serem calculados separados por espaço ou vírgula")
-            s = st.text_area(label=' ', key='text_area1')
+            s = st.text_area(label=' ', key='text_area1')  # input do usuário
             st.caption(f"### Números a serem calculados: {s}")
             
+            # Seleção de medidas
             st.markdown("### Selecione o que deseja calcular: ")
             mediacbx = st.checkbox("Média") 
             medianacbx = st.checkbox("Mediana")
@@ -255,23 +366,28 @@ button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
             coeficientecbx = st.checkbox("Coeficiente de Variação")
             
             sub2 = st.form_submit_button("Calcular")
+
         if sub2:
             try:
+                # Converte string para lista de floats (aceita vírgula/ponto)
                 nums = parse_numeros(s)
                 if not nums:
                     raise ValueError("Nenhum número encontrado.")
+
+                # Constrói frequência e ordena (xi, fi)
                 freq = Counter(nums)
-                df_freq = pd.DataFrame(sorted(freq.items()), columns=["xi","fi"])
+                df_freq = pd.DataFrame(sorted(freq.items()), columns=["xi", "fi"])
                 
+                # Cálculos
                 m = arredondar(media_ponderada_df(df_freq), 2)
                 me = arredondar(mediana_df(df_freq), 2)
                 modais, tipo = moda_df(df_freq)
                 variance = arredondar(variancia_df(df_freq), 2)
                 desvio_padrao = arredondar(math.sqrt(variance), 2)
-                cv = (100 * desvio_padrao)/m
+                cv = (100 * desvio_padrao) / m
                 coeficiente_variacao = arredondar(cv, 2)
                 
-                # ======== IMPRESSÃO EM 2 COLUNAS (sem metric para não truncar) ========
+                # Impressão em 2 colunas (sem truncar)
                 cards = []
                 if mediacbx:        cards.append(("Média", f"{m:.2f}"))
                 if medianacbx:      cards.append(("Mediana", f"{me:.2f}"))
@@ -284,12 +400,14 @@ button[data-baseweb="tab"] > div[data-testid="stMarkdownContainer"] > p {
                 for i, (titulo, valor) in enumerate(cards):
                     with cols[i % 2]:
                         st.success(f"**{titulo}:** {valor}")
-                # ============================================================
                 
             except Exception as e:
                 st.error(f"Entrada inválida: {e}")
-                
-                
+
+
+# =====================================================================================
+# ABA 2: Agrupamento por Classes
+# =====================================================================================
 with aba_principal2:
     st.subheader("Agrupamento por Classes")
     st.markdown(
@@ -297,16 +415,18 @@ with aba_principal2:
         "Clique em **Adicionar classe (+)** para criar a próxima com o mesmo `h = Ls − Li`."
     )
 
+    # DataFrame da sessão para persistir a tabela entre reruns
     if 'df_classes' not in st.session_state:
         st.session_state.df_classes = pd.DataFrame([{"Li": None, "Ls": None, "fi": None}])
 
-    # ===== UM ÚNICO FORM (editor -> botão + -> checkboxes -> Calcular) =====
+    # Um único form combina: editor + botão adicionar + checkboxes + calcular
     with st.form("form_classes_all", clear_on_submit=False):
         edited_df = st.data_editor(
             st.session_state.df_classes,
-            num_rows="fixed",                # sem '+' nativo
+            num_rows="fixed",                # sem '+' nativo do editor (vamos controlar pelo botão)
             use_container_width=True,
             column_config={
+                # Exibição como inteiros (format="%d"); step=1 para facilitar digitação
                 "Li": st.column_config.NumberColumn("Limite Inferior (lᵢ)", format="%d", step=1),
                 "Ls": st.column_config.NumberColumn("Limite Superior (lₛ)", format="%d", step=1),
                 "fi": st.column_config.NumberColumn("Frequência (fi)", min_value=0, step=1, format="%d"),
@@ -314,9 +434,10 @@ with aba_principal2:
             key="editor_classes"
         )
 
-        # Botão + ANTES dos checkboxes
+        # Botão de adicionar classe vem ANTES dos checkboxes
         add_clicked = st.form_submit_button("Adicionar classe (+)", use_container_width=True)
 
+        # Checkboxes para escolher o que calcular
         st.markdown("### Selecione o que deseja calcular: ")
         mediacbx        = st.checkbox("Média")
         medianacbx      = st.checkbox("Mediana")
@@ -328,44 +449,58 @@ with aba_principal2:
 
         calc_clicked = st.form_submit_button("Calcular", use_container_width=True)
 
-    # ===== (+): usa exatamente o que está NA TELA (edited_df) =====
+    # ---------------------------
+    # Lógica do botão (+)
+    # ---------------------------
     if add_clicked:
+        # 'edited_df' já traz o que está na tela (confirmado ao enviar o form)
         base = edited_df.copy()
 
+        # Converte colunas para numérico, ignorando erros
         tmp = base.copy()
         tmp["Li"] = pd.to_numeric(tmp["Li"], errors="coerce")
         tmp["Ls"] = pd.to_numeric(tmp["Ls"], errors="coerce")
 
+        # Considera apenas linhas com Li e Ls válidos para calcular h
         comp = tmp.dropna(subset=["Li", "Ls"])
         if not comp.empty:
-            last_idx = comp.index.max()
+            last_idx = comp.index.max()              # última linha completa
             prev_Li  = int(round(tmp.loc[last_idx, "Li"]))
             prev_Ls  = int(round(tmp.loc[last_idx, "Ls"]))
-            h_int    = int(round(prev_Ls - prev_Li))
+            h_int    = int(round(prev_Ls - prev_Li)) # largura de classe como inteiro
+
+            # Se h > 0, cria próxima classe [prev_Ls, prev_Ls + h]
             if h_int > 0:
                 new_row = {"Li": prev_Ls, "Ls": prev_Ls + h_int, "fi": None}
             else:
+                # Se não houver h válido, adiciona linha vazia
                 new_row = {"Li": None, "Ls": None, "fi": None}
         else:
+            # Se não houver nenhuma linha completa, adiciona linha vazia
             new_row = {"Li": None, "Ls": None, "fi": None}
 
-        st.session_state.df_classes = pd.concat(
-            [base, pd.DataFrame([new_row])], ignore_index=True
-        )
+        # Persiste a nova linha no session_state e força rerun para atualizar a UI
+        st.session_state.df_classes = pd.concat([base, pd.DataFrame([new_row])], ignore_index=True)
         st.rerun()
 
-    # ===== Calcular: usa o edited_df confirmado pelo form =====
+    # ---------------------------
+    # Lógica do botão "Calcular"
+    # ---------------------------
     if calc_clicked:
         try:
+            # Copia os dados do editor e força para numérico
             tabela_classes = edited_df.copy()
             tabela_classes["Li"] = pd.to_numeric(tabela_classes["Li"], errors="coerce")
             tabela_classes["Ls"] = pd.to_numeric(tabela_classes["Ls"], errors="coerce")
             tabela_classes["fi"] = pd.to_numeric(tabela_classes["fi"], errors="coerce")
+
+            # Mantém apenas linhas com Li, Ls e fi preenchidos
             tabela_classes = tabela_classes.dropna(subset=["Li", "Ls", "fi"]).astype(float)
 
             if tabela_classes.empty:
                 raise ValueError("A tabela está vazia ou contém dados inválidos.")
 
+            # Cálculos principais
             media = media_agrupada(tabela_classes)
             mediana = mediana_agrupada(tabela_classes)
             modas_brutas, modas_czuber, tipo_moda = moda_agrupada(tabela_classes)
@@ -373,22 +508,21 @@ with aba_principal2:
             desvio_padrao = arredondar(math.sqrt(variancia))
             coeficiente_variacao = arredondar((100 * desvio_padrao) / media, 2) if media != 0 else None
 
-            # ======== IMPRESSÃO EM 2 COLUNAS (sem metric para não truncar) ========
+            # Impressão em 2 colunas (st.success evita truncar)
             cards = []
             if mediacbx:        cards.append(("Média", f"{media:.2f}"))
             if medianacbx:      cards.append(("Mediana", f"{mediana:.2f}"))
             if varianciacbx:    cards.append(("Variância", f"{variancia:.2f}"))
             if desviopadraocbx: cards.append(("Desvio Padrão", f"{desvio_padrao:.2f}"))
-            if coeficientecbx:
-                cards.append(("Coeficiente de Variação", f"{coeficiente_variacao:.2f}%" if coeficiente_variacao is not None else "Indefinido"))
-            if modabrutacbx:    cards.append(("Moda Bruta", ", ".join(f"{m:.2f}" for m in modas_brutas)))
+            if coeficientecbx:  cards.append(("Coeficiente de Variação", f"{coeficiente_variacao:.2f}%" if coeficiente_variacao is not None else "Indefinido"))
+            if modabrutacbx:    cards.append((f"Moda Bruta ({tipo_moda})", ", ".join(f"{m:.2f}" for m in modas_brutas)))
+            # Para Czuber, valores None aparecem como "N/A"
             if modaczubercbx:   cards.append(("Moda de Czuber", ", ".join("N/A" if m is None else f"{m:.2f}" for m in modas_czuber)))
 
             cols = st.columns(2)
             for i, (titulo, valor) in enumerate(cards):
                 with cols[i % 2]:
                     st.success(f"**{titulo}:** {valor}")
-            # ============================================================
 
         except Exception as e:
             st.error(f"Erro: {e}")
