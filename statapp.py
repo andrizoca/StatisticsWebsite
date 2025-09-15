@@ -303,7 +303,7 @@ with aba_principal1:
                 },
                 key=f"editor_discreto_{st.session_state['editor_discreto_seed']}"  # seed na key
             )
-
+        
             # [LIMPAR] botão logo abaixo da tabela
             clear_tab1 = st.form_submit_button("Limpar tabela", type="secondary", use_container_width=True)
             
@@ -318,7 +318,7 @@ with aba_principal1:
             
             # Botão Calcular sozinho
             sub = st.form_submit_button("Calcular", use_container_width=True)
-
+        
         # [Limpar] reset do editor após o form (recria o widget e zera o DF)
         if clear_tab1:
             st.session_state.df_discreto = base.copy()
@@ -474,6 +474,7 @@ with aba_principal2:
 
         # Botões logo abaixo da tabela
         add_clicked = st.form_submit_button("Adicionar classe (+)", use_container_width=True)
+        st.divider()
         clear_classes = st.form_submit_button("Limpar tabela", type="secondary", use_container_width=True)
 
         # Checkboxes para escolher o que calcular
@@ -492,6 +493,7 @@ with aba_principal2:
     # ---------------------------
     # [Limpar] reset da tabela de classes
     # ---------------------------
+    
     if clear_classes:
         st.session_state.df_classes = pd.DataFrame([{"Li": None, "Ls": None, "fi": None}])
         if "editor_classes" in st.session_state:
