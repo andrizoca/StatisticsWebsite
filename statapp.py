@@ -249,13 +249,15 @@ div[data-testid="stCheckbox"] label {
 st.title(":red[Bem vindo ao site de Estatística]", anchor=None)
 st.subheader("Esta aplicação é uma calculadora que utiliza agrupamentos discreto e por classes para calcular: ")
 st.markdown("##### Cálculo de média - Mediana - Modas - Variância - Desvio Padrão - Coeficiente de Variação")
-st.markdown(":gray[_Criado por Andriy Tam, Henrique Sabino, Paulo Santos e Luis Carlos Oliveira_]")
+st.markdown(":gray[_Criado por Andriy Tam, Henrique Sabino, Paulo Santos e Luis Carlos Oliveira._]")
+st.markdown(":gray[_Instruído por João Carlos Santos._]")
 st.divider()
 
 
 # -------------------------------
 # Abas principais
 # -------------------------------
+st.markdown("## Selecione o tipo de agrupamento desejado:")
 aba_principal1, aba_principal2 = st.tabs(["Agrupamento Discreto", "Agrupamento por Classes"])
 
 
@@ -292,6 +294,7 @@ with aba_principal1:
         base = pd.DataFrame({"xi": [None], "fi": [None]})
         clear_tab1 = False  # [Limpar] default
         with st.form("form_tabela"):
+            st.markdown("### Insira os valores `xᵢ` e `fᵢ` a serem calculados na tabela.")
             st.markdown("#### Para adicionar mais linhas, **clique no `+` abaixo da tabela**.")
             edited = st.data_editor(
                 st.session_state.df_discreto,
@@ -378,7 +381,7 @@ with aba_principal1:
             </style>
             """, unsafe_allow_html=True)
 
-            st.subheader("Digite os números a serem calculados separados por espaço")
+            st.subheader("Digite os valores a serem calculados separados por espaço na tabela abaixo:")
             # Usa seed na key para recriar o widget ao limpar (evita modificar uma key já instanciada)
             s = st.text_area(label=' ', key=f'text_area1_{st.session_state["text_area1_seed"]}')
             st.caption(f"### Números a serem calculados: {s}")
@@ -446,9 +449,10 @@ with aba_principal1:
 # =====================================================================================
 with aba_principal2:
     st.subheader("Agrupamento por Classes")
+    st.markdown("### Insira os valores na tabela abaixo")
     st.markdown(
-        "Preencha `Li` e `Ls` na primeira linha. "
-        "Clique em **Adicionar classe (+)** para criar a próxima com o mesmo `h = Ls − Li`."
+        "##### :gray[Preencha `Li` e `Ls` na primeira linha. "
+        "Clique em **Adicionar classe (+)** para criar a próxima (preenchimento automático).]"
     )
 
     # DataFrame da sessão para persistir a tabela entre reruns
