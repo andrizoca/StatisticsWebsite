@@ -257,6 +257,7 @@ st.divider()
 # -------------------------------
 # Abas principais
 # -------------------------------
+st.markdown("# :red[Calculadora Estatística]")
 st.markdown("## Selecione o tipo de agrupamento desejado:")
 aba_principal1, aba_principal2 = st.tabs(["Agrupamento Discreto", "Agrupamento por Classes"])
 
