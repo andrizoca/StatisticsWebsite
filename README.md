@@ -46,7 +46,7 @@ pip install -r requirements.txt
 
 Run the application with:
 
-streamlit run app.py
+streamlit run statapp.py
 
 
 
