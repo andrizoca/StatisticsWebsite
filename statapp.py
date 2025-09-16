@@ -322,7 +322,7 @@ with aba_principal1:
             
             # Botão Calcular sozinho
             sub = st.form_submit_button("Calcular", use_container_width=True)
-        
+        st.markdown("## Resultados:")
         # [Limpar] reset do editor após o form (recria o widget e zera o DF)
         if clear_tab1:
             st.session_state.df_discreto = base.copy()
@@ -401,7 +401,7 @@ with aba_principal1:
             
             # Botão Calcular sozinho
             sub2 = st.form_submit_button("Calcular", use_container_width=True)
-
+        st.markdown("## Resultados:")
         # [Limpar] recria o text_area com nova key (sem tocar na key já instanciada)
         if clear_text:
             st.session_state["text_area1_seed"] += 1
@@ -469,11 +469,10 @@ with aba_principal2:
             num_rows="fixed",                # sem '+' nativo do editor (vamos controlar pelo botão)
             use_container_width=True,
             column_config={
-                # Exibição como inteiros (format="%d"); step=1 para facilitar digitação
-                "Li": st.column_config.NumberColumn("Limite Inferior (lᵢ)", format="%d", step=1),
-                "Ls": st.column_config.NumberColumn("Limite Superior (lₛ)", format="%d", step=1),
+                "Li": st.column_config.NumberColumn("Limite Inferior (lᵢ)", format="%.2f", step=0.0001),
+                "Ls": st.column_config.NumberColumn("Limite Superior (lₛ)", format="%.2f", step=0.0001),
                 "fi": st.column_config.NumberColumn("Frequência (fi)", min_value=0, step=1, format="%d"),
-            },
+            },  
             key="editor_classes"
         )
 
@@ -494,7 +493,7 @@ with aba_principal2:
 
         # Botão Calcular sozinho
         calc_clicked = st.form_submit_button("Calcular", use_container_width=True)
-
+    st.markdown("## Resultados:")
     # ---------------------------
     # [Limpar] reset da tabela de classes
     # ---------------------------
@@ -521,13 +520,13 @@ with aba_principal2:
         comp = tmp.dropna(subset=["Li", "Ls"])
         if not comp.empty:
             last_idx = comp.index.max()              # última linha completa
-            prev_Li  = int(round(tmp.loc[last_idx, "Li"]))
-            prev_Ls  = int(round(tmp.loc[last_idx, "Ls"]))
-            h_int    = int(round(prev_Ls - prev_Li)) # largura de classe como inteiro
+            prev_Li  = (tmp.loc[last_idx, "Li"])
+            prev_Ls  = (tmp.loc[last_idx, "Ls"])
+            h  = prev_Ls - prev_Li
 
             # Se h > 0, cria próxima classe [prev_Ls, prev_Ls + h]
-            if h_int > 0:
-                new_row = {"Li": prev_Ls, "Ls": prev_Ls + h_int, "fi": None}
+            if h > 0:
+                new_row = {"Li": prev_Ls, "Ls": prev_Ls + h, "fi": None}
             else:
                 # Se não houver h válido, adiciona linha vazia
                 new_row = {"Li": None, "Ls": None, "fi": None}
