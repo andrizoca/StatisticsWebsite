@@ -74,8 +74,7 @@ pip install -r requirements.txt
 
 Run the application with:
 
-streamlit 🏠Início.py
-
+streamlit run Início.py
 
 
 
