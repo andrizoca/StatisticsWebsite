@@ -74,7 +74,10 @@ pip install -r requirements.txt
 
 Run the application with:
 
-streamlit run statapp.py
+streamlit 🏠Início.py
+
+
+
 
 Then open the link shown in the terminal (usually http://localhost:8501) in your browser.
 

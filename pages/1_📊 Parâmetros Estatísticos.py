@@ -8,8 +8,6 @@ from collections import Counter
 from decimal import Decimal, ROUND_HALF_UP
 import statistics
 import math
-
-
 # -------------------------------
 # Funções utilitárias / estatística
 # -------------------------------
@@ -211,7 +209,7 @@ def variancia_agrupada(df: pd.DataFrame, media: float) -> float:
 # -------------------------------
 # Configuração e estilo da página
 # -------------------------------
-st.set_page_config(page_title="Estatística", page_icon="heavy_plus_sign", layout="wide")
+st.set_page_config(page_title="Parâmetros Estatísticos", page_icon="📊", layout="wide")
 
 # Seeds para recriar widgets ao limpar (evita mexer em keys já instanciadas)
 if "text_area1_seed" not in st.session_state:
@@ -242,26 +240,17 @@ div[data-testid="stCheckbox"] label {
 </style>
 """, unsafe_allow_html=True)
 
-
-# -------------------------------
-# Cabeçalho
-# -------------------------------
-st.title(":red[Bem vindo ao site de Estatística]", anchor=None)
-st.subheader("Esta aplicação é uma calculadora que utiliza agrupamentos discreto e por classes para calcular: ")
-st.markdown("##### Cálculo de média - Mediana - Modas - Variância - Desvio Padrão - Coeficiente de Variação")
-st.markdown(":gray[_Criado por Andriy Tam, Henrique Sabino, Paulo Santos e Luis Carlos Oliveira._]")
-st.markdown(":gray[_Instruído por João Carlos Santos._]")
-st.divider()
-
-
 # -------------------------------
 # Abas principais
 # -------------------------------
-st.markdown("# :red[Calculadora Estatística]")
+st.title("📊Parâmetros Estatísticos")
+
+st.divider()
 st.markdown("## Selecione o tipo de agrupamento desejado:")
 aba_principal1, aba_principal2 = st.tabs(["Agrupamento Discreto", "Agrupamento por Classes"])
 
-
+st.sidebar.header("Navegação")
+st.sidebar.write("Escolha uma página na barra lateral 👈")
 # =====================================================================================
 # ABA 1: Agrupamento Discreto
 # =====================================================================================
