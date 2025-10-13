@@ -3,7 +3,7 @@ import streamlit as st
 # -------------------------------
 # Configuração da página
 # -------------------------------
-st.set_page_config(page_title="Home", page_icon="🏠", layout="wide")
+st.set_page_config(page_title="Início", page_icon="🏠", layout="wide")
 
 # -------------------------------
 # Sidebar
@@ -67,8 +67,8 @@ st.divider()
 # -------------------------------
 st.markdown("## 🚀 Acessos rápidos")
 st.page_link("pages/1_📊 Parâmetros Estatísticos.py", label="📊 Parâmetros Estatísticos")
-st.page_link("pages/2_📈 Regressão Linear.py", label="📈 Regressão Linear")
-st.page_link("pages/3_🎲 Probabilidade.py", label="🎲 Probabilidade")
+st.page_link("pages/2_🎲 Probabilidade.py", label="🎲 Probabilidade")
+st.page_link("pages/3_📈 Regressão Linear.py", label="📈 Regressão Linear")
 
 st.divider()
 
